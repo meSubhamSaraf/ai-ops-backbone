@@ -15,6 +15,10 @@ from app.repositories.platform_user_repo import (
 
 from app.services.slack_service import fetch_slack_user
 
+from app.processors.message_classifier import classify_message
+
+from app.processors.question_processor import process_question
+
 
 router = APIRouter()
 
@@ -85,14 +89,32 @@ async def slack_events(request: Request):
                 event.get("channel")
             )
 
-            action_count = process_action_items(
-                                message_id,
-                                client_name,
-                                event.get("text"),
-                                sender_name,
-                                conn,
-                                cur
-                            )
+            message_text = event.get("text")
+
+            classification = classify_message(message_text)
+
+            message_type = classification.get("type")
+
+            if message_type == "task":
+            
+                process_action_items(
+                    message_id,
+                    client_name,
+                    message_text,
+                    sender_name,
+                    conn,
+                    cur
+                )
+                
+            elif message_type == "question":
+                product = "connect_api" #temporary , need to add in DB of client channel and get it from there
+                process_question(
+                    message_id,
+                    client_name,
+                    product,
+                    message_text,
+                    cur
+                )
 
             cur.execute(
                 "UPDATE raw_messages SET processed=true WHERE id=%s",
